@@ -213,6 +213,7 @@ public class GeneticAlgorithmSolver {
     }
 
     private boolean isSlotOccupied(int session, int slot, Map<Integer, Integer> assignments, AClassSegment currentSegment) {
+        // assignments = current assignment
         // Find which class the current segment belongs to
         AClass currentClass = findClassForSegment(currentSegment);
         if (currentClass == null) return false;
@@ -269,7 +270,7 @@ public class GeneticAlgorithmSolver {
         int numClassesNotInCombination = cntClassesNotInCombination(chromosome);
         fitness -= numClassesNotInCombination * PENALTY_RATE;
 
-        // 3. Calculate teacher count using util.MaxClique
+        // 3. Calculate teacher count using MaxClique
         int teacherCount = calculateTeacherCount(chromosome);
         double teacherFitness = 1.0 / (1.0 + teacherCount);
         fitness += teacherFitness;
@@ -303,7 +304,9 @@ public class GeneticAlgorithmSolver {
 
         for (Map.Entry<String, Map<Integer, List<Integer>>> courseEntry : courseSessionSlots.entrySet()) {
             // For each session in this course
-            for (List<Integer> slotsInSession : courseEntry.getValue().values()) {
+            for (Map.Entry<Integer, List<Integer>> sessionEntry : courseEntry.getValue().entrySet()) {
+                int currentSession = sessionEntry.getKey();
+                List<Integer> slotsInSession = sessionEntry.getValue();
                 if (slotsInSession.size() <= 1) continue;
                 // Sort slots within session
                 Collections.sort(slotsInSession);
@@ -312,6 +315,7 @@ public class GeneticAlgorithmSolver {
                     // Find the segment at this slot
                     AClassSegment currentSeg = findSegmentBySlotInCourse(
                             slotsInSession.get(i),
+                            currentSession,
                             courseEntry.getKey(),
                             chromosome
                     );
@@ -320,6 +324,7 @@ public class GeneticAlgorithmSolver {
                     if (i < slotsInSession.size() - 1) {
                         AClassSegment nextSeg = findSegmentBySlotInCourse(
                                 slotsInSession.get(i + 1),
+                                currentSession,
                                 courseEntry.getKey(),
                                 chromosome
                         );
@@ -328,7 +333,6 @@ public class GeneticAlgorithmSolver {
                             if (slotsInSession.get(i) + currentSeg.duration == slotsInSession.get(i + 1)) {
                                 totalCompactness += 1; // Bonus for consecutive slots
                             }
-
                         }
                     }
                 }
@@ -338,11 +342,16 @@ public class GeneticAlgorithmSolver {
         return totalCompactness;
     }
 
-    private AClassSegment findSegmentBySlotInCourse(int slotInSession, String course, Chromosome chromosome) {
+    private AClassSegment findSegmentBySlotInCourse(int slotInSession, int session, String course, Chromosome chromosome) {
         for (Map.Entry<Integer, Integer> entry : chromosome.getSlotAssignments().entrySet()) {
             AClassSegment seg = findSegmentById(entry.getKey());
+            int absoluteSlot = entry.getValue();
+            int segmentSession = absoluteSlot / nbSlotPerSession;
+            int relativeSlot = absoluteSlot % nbSlotPerSession;
+
             if (seg.getCourse().equals(course) &&
-                    (entry.getValue() % nbSlotPerSession) == slotInSession) {
+                    relativeSlot == slotInSession &&
+                    segmentSession == session) {
                 return seg;
             }
         }
@@ -357,13 +366,12 @@ public class GeneticAlgorithmSolver {
         for (Map.Entry<Integer, Integer> entry : chromosome.getSlotAssignments().entrySet()) {
             AClassSegment seg = findSegmentById(entry.getKey());
             String course = seg.getCourse();
-
-            // Find the util.AClass this segment belongs to
+            // Find the AClass this segment belongs to
             for (AClass cls : classes) {
                 if (cls.course.equals(course)) {
                     for (AClassSegment classSeg : cls.classSegments) {
                         if (classSeg.id == seg.id) {
-                            // Create util.SolutionClass for this assignment
+                            // Create SolutionClass for this assignment
                             List<int[]> periods = new ArrayList<>();
                             int slot = entry.getValue();
                             periods.add(new int[]{slot % nbSlotPerSession,
@@ -379,7 +387,6 @@ public class GeneticAlgorithmSolver {
                 }
             }
         }
-
         // Calculate max clique for each course
         for (String course : courses) {
             Map<AClass, SolutionClass> courseSolution = courseSolutions.get(course);
@@ -389,7 +396,6 @@ public class GeneticAlgorithmSolver {
                 totalTeachers += teachersNeeded;
             }
         }
-
         return totalTeachers;
     }
 
@@ -490,9 +496,13 @@ public class GeneticAlgorithmSolver {
 
     private void crossover(Chromosome c1, Chromosome c2) {
         // Implement order crossover (OX)
+        int totalSegments = 0;
+        for (AClass cls : classes) {
+            totalSegments += cls.classSegments.size();
+        }
         Random rand = new Random();
-        int point1 = rand.nextInt(totalClasses);
-        int point2 = rand.nextInt(totalClasses - point1) + point1;
+        int point1 = rand.nextInt(totalSegments);
+        int point2 = rand.nextInt(totalSegments - point1) + point1;
 
         Map<Integer, Integer> temp1 = new HashMap<>(c1.getSlotAssignments());
         Map<Integer, Integer> temp2 = new HashMap<>(c2.getSlotAssignments());
@@ -508,7 +518,6 @@ public class GeneticAlgorithmSolver {
                 c2.getSlotAssignments().put(segId, slot1);
             }
         }
-
         c1.setEvaluated(false);
         c2.setEvaluated(false);
     }
@@ -575,7 +584,7 @@ public class GeneticAlgorithmSolver {
 
     public static void main(String[] args) {
         // Test file path
-        String testFile = "/Users/moctran/Desktop/HUST/2024.2/GraduationResearch/TimetablingAlgorithmPackage/data/0.txt"; // Update this path as needed
+        String testFile = "/Users/moctran/Desktop/HUST/2024.2/GraduationResearch/TimetablingAlgorithmPackage/data/ch1-3th-s.txt"; // Update this path as needed
 
         System.out.println("Starting Genetic Algorithm Solver test with file" + testFile);
 

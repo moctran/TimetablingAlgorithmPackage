@@ -1,7 +1,3 @@
-package util;
-
-import util.AClass;
-
 import java.util.List;
 
 public class CombinationChecker {
@@ -9,17 +5,16 @@ public class CombinationChecker {
     private List<String> courses;
     int nbCourses;
     int nbClasses;
-    private SolutionClass[] x; //x[i] is the solution for class i
+    private SolutionClass[] x;//x[i] is the solution for class i
     private boolean[][] overlap; // overlap[i][j] = true means that class i and j overlap
-    List<Integer>[] classIndicesOfCourse; // classIndicesOfCourse[i] - the list of classes in course i
+    List<Integer>[] classIndicesOfCourse;
     int[] courseOfClass;
-    private int idxClass; // the current class being checked
-    private int idxCourse; // the course of the class being checked
-    private int[] y; // the current combination
-    private boolean ans; // whether or not the class being checked belongs to a combination
+    private int idxClass;
+    private int idxCourse;
+    private int[] y;
+    private boolean ans;
 
-    private boolean check(int v, int i) { // objective Y[0], Y[1], .. pair-wise not-overlap
-        //check if class v overlaps with any of the classes put in the current combination
+    private boolean check(int v, int i) {// objective Y[0], Y[1], .. pair-wise not-overlap
         for (int j = 0; j <= i - 1; j++) {
             if (overlap[y[j]][v]) return false;
         }
@@ -35,7 +30,7 @@ public class CombinationChecker {
         if (i == idxCourse) {
             if (check(idxClass, i)) {
                 y[i] = idxClass;
-                if (i == nbCourses - 1) {
+                if (i == classIndicesOfCourse.length - 1) {
                     solution();
                 } else {
                     tryY(i + 1);
@@ -46,7 +41,7 @@ public class CombinationChecker {
         for (int v : classIndicesOfCourse[i]) {
             if (check(v, i)) {
                 y[i] = v;
-                if (i == nbCourses - 1) {
+                if (i == classIndicesOfCourse.length - 1) {
                     solution();
                 } else {
                     tryY(i + 1);

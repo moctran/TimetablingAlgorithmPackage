@@ -1,20 +1,14 @@
-package util;
-
-import util.AClass;
-import util.SolutionClass;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 public class MaxClique {
     Map<AClass, SolutionClass> sol;
-    int n; // number of classes
-    boolean[][] A; // overlap array
-    int[] x; // current clique
+    int n;
+    boolean[][] A;
+    int[] x;
 
     private boolean check(int v, int k) {
-        // check if class v overlaps with added classes to the clique
         for (int i = 0; i < k; i++)
             if (A[x[i]][v] == false) return false;
         return true;
