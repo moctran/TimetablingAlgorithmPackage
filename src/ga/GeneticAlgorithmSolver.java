@@ -60,6 +60,7 @@ public class GeneticAlgorithmSolver {
     }
 
     public void inputFile(String filename) {
+        System.out.println("Loading input file...");
         try {
             java.io.BufferedReader in = new java.io.BufferedReader(
                     new java.io.InputStreamReader(new java.io.FileInputStream(filename)));
@@ -91,7 +92,6 @@ public class GeneticAlgorithmSolver {
 
             courses = new ArrayList<>(mCourse2Classes.keySet());
             totalClasses = classes.size();
-
             in.close();
         } catch (Exception e) {
             System.out.println("Error reading input file");
@@ -228,8 +228,8 @@ public class GeneticAlgorithmSolver {
             int assignedSlotInSession = assignedSlot % nbSlotPerSession;
 
             if (session == assignedSession) {
-                if (slot >= assignedSlotInSession &&
-                        slot < assignedSlotInSession + seg.duration) {
+                if ((slot >= assignedSlotInSession && slot < assignedSlotInSession + seg.duration)
+                || (slot < assignedSlotInSession && slot + currentSegment.duration >= assignedSlotInSession)) {
                     return true;
                 }
             }
@@ -509,7 +509,7 @@ public class GeneticAlgorithmSolver {
 
         // Swap assignments between crossover points
         for (int i = point1; i <= point2; i++) {
-            int segId = i + 1; // Assuming segment IDs start from 1
+            int segId = i + 1; // Segment IDs start from 1
             Integer slot1 = temp1.get(segId);
             Integer slot2 = temp2.get(segId);
 
@@ -581,31 +581,32 @@ public class GeneticAlgorithmSolver {
             System.out.println("Segment " + segId + " (Course " + seg.getCourse() +") " + "-> Session " + session + " Slot " + slotInSession + " Duration " + seg.duration);
         }
     }
+public void printInput(){
+    System.out.println("Loaded " + this.totalClasses + "  classes across " + this.courses.size() + " courses");
+    System.out.println("Sessions: " + this.nbSessions + ", Slots per session: " + this.nbSlotPerSession);
 
+    // Print class details
+    for (AClass cls : this.classes) {
+        System.out.println("Class " + cls.id + " (Course " + cls.course + "): " + cls.classSegments.size() + " segments");
+        for (AClassSegment seg : cls.classSegments) {
+            System.out.println("Segment " + seg.id + ": duration= " + seg.duration);
+        }
+    }
+}
     public static void main(String[] args) {
         // Test file path
-        String testFile = "/Users/moctran/Desktop/HUST/2024.2/GraduationResearch/TimetablingAlgorithmPackage/data/ch1-3th-s.txt"; // Update this path as needed
+        String testFile = "/Users/moctran/Desktop/HUST/2024.2/GraduationResearch/TimetablingAlgorithmPackage/data/em4-2nd-s-ext1.txt"; // Update this path as needed
 
         System.out.println("Starting Genetic Algorithm Solver test with file" + testFile);
 
         GeneticAlgorithmSolver solver = new GeneticAlgorithmSolver();
 
         // Load input
-        System.out.println("Loading input file...");
         solver.inputFile(testFile);
-        System.out.println("Loaded " + solver.totalClasses + "  classes across " + solver.courses.size() + " courses");
-        System.out.println("Sessions: " + solver.nbSessions + ", Slots per session: " + solver.nbSlotPerSession);
-
-        // Print class details
-        for (AClass cls : solver.classes) {
-            System.out.println("Class " + cls.id + " (Course " + cls.course + "): " + cls.classSegments.size() + " segments");
-            for (AClassSegment seg : cls.classSegments) {
-                System.out.println("Segment " + seg.id + ": duration= " + seg.duration);
-            }
-        }
+        solver.printInput();
 
         // Run solver
-        System.out.println("\nStarting solver with parameters:");
+        System.out.println("Starting solver with parameters:");
         System.out.println("Population size: " + solver.populationSize);
         System.out.println("Max generations: " + solver.maxGenerations);
         System.out.println("Mutation rate: " + solver.mutationRate);
