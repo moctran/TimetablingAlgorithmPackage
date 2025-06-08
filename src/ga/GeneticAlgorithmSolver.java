@@ -25,12 +25,11 @@ public class GeneticAlgorithmSolver {
     private boolean foundSolution = false;
 
     // Metrics tracking
-    private List<Double> convergenceCurve;
     private int generationsUntilBest;
     private double bestFitness;
 
     public GeneticAlgorithmSolver() {
-        this(400, 300, 0.3, 0.9); // Default parameters
+        this(500, 750, 0.4, 0.75); // Default parameters
     }
 
     public GeneticAlgorithmSolver(int populationSize, int maxGenerations, double mutationRate, double crossoverRate) {
@@ -42,17 +41,8 @@ public class GeneticAlgorithmSolver {
         this.classes = new ArrayList<>();
         this.mCourse2Classes = new HashMap<>();
         this.courses = new ArrayList<>();
-        this.convergenceCurve = new ArrayList<>();
         this.generationsUntilBest = -1;
         this.bestFitness = Double.NEGATIVE_INFINITY;
-    }
-
-    public int getNbSlotPerSession() {
-        return nbSlotPerSession;
-    }
-
-    public List<Double> getConvergenceCurve() {
-        return convergenceCurve;
     }
 
     public int getGenerationsUntilBest() {
@@ -119,12 +109,8 @@ public class GeneticAlgorithmSolver {
                 System.out.println("Generation " + generation + ": New best fitness = " + bestChromosome.getFitness());
             }
 
-            // Record convergence data
-            convergenceCurve.add(population.get(0).getFitness());
-
             // Create new population
             List<Chromosome> newPopulation = new ArrayList<>();
-
             // Elitism - keep best 10% of population
             int eliteSize = populationSize / 10;
             for (int i = 0; i < eliteSize; i++) {
@@ -228,8 +214,7 @@ public class GeneticAlgorithmSolver {
             int assignedSlotInSession = assignedSlot % nbSlotPerSession;
 
             if (session == assignedSession) {
-                if ((slot >= assignedSlotInSession && slot < assignedSlotInSession + seg.duration)
-                || (slot < assignedSlotInSession && slot + currentSegment.duration >= assignedSlotInSession)) {
+                if (slot >= assignedSlotInSession && slot < assignedSlotInSession + seg.duration) {
                     return true;
                 }
             }
@@ -255,14 +240,14 @@ public class GeneticAlgorithmSolver {
     }
 
     private void evaluateChromosome(Chromosome chromosome) {
-        double fitness = 0.0;
-
-        // 1. Check if all segments are assigned
-        int assignedSegments = chromosome.getSlotAssignments().size();
         int totalSegments = 0;
         for (AClass cls : classes) {
             totalSegments += cls.classSegments.size();
         }
+        double fitness = 0.0;
+
+        // 1. Check if all segments are assigned
+        int assignedSegments = chromosome.getSlotAssignments().size();
         double completeness = (double) assignedSegments / totalSegments;
         fitness += completeness;
 
@@ -270,18 +255,21 @@ public class GeneticAlgorithmSolver {
         int numClassesNotInCombination = cntClassesNotInCombination(chromosome);
         fitness -= numClassesNotInCombination * PENALTY_RATE;
 
-        // 3. Calculate teacher count using MaxClique
-        int teacherCount = calculateTeacherCount(chromosome);
-        double teacherFitness = 1.0 / (1.0 + teacherCount);
-        fitness += teacherFitness;
+        // 3. Calculate teacher count using MaxClique only if combination is valid
+        double teacherFitness = 0.0;
+        if (numClassesNotInCombination == 0) {  // Only if all classes are in valid combinations
+            int teacherCount = calculateTeacherCount(chromosome);
+            teacherFitness = 1.0 / (1.0 + teacherCount);
+            fitness += teacherFitness;
+        }
 
         // 4. Calculate course compactness and overlap penalty
         double compactness = calculateCompactness(chromosome);
-
         fitness += compactness;
 
-        System.out.println("Fitness calculation: completeness=" + completeness + ", teacherCount=" + teacherCount + ", teacherFitness=" + teacherFitness +
-                ", numClassesNotInCombination=" + numClassesNotInCombination + ", compactness=" + compactness + ", totalFitness=" + fitness);
+        System.out.println("Fitness calculation: completeness=" + completeness +
+                ", numClassesNotInCombination=" + numClassesNotInCombination + ", teacherFitness=" + teacherFitness +
+                ", compactness=" + compactness + ", totalFitness=" + fitness);
 
         chromosome.setFitness(fitness);
         chromosome.setEvaluated(true);
@@ -581,21 +569,64 @@ public class GeneticAlgorithmSolver {
             System.out.println("Segment " + segId + " (Course " + seg.getCourse() +") " + "-> Session " + session + " Slot " + slotInSession + " Duration " + seg.duration);
         }
     }
-public void printInput(){
-    System.out.println("Loaded " + this.totalClasses + "  classes across " + this.courses.size() + " courses");
-    System.out.println("Sessions: " + this.nbSessions + ", Slots per session: " + this.nbSlotPerSession);
+    public void printSolutionPrefixFormat(){
+        if (!foundSolution) {
+            System.out.println("No solution found");
+            return;
+        }
+        // Create a map of class ID to its segments' session and slot info
+        Map<Integer, List<int[]>> classSchedules = new HashMap<>();
 
-    // Print class details
-    for (AClass cls : this.classes) {
-        System.out.println("Class " + cls.id + " (Course " + cls.course + "): " + cls.classSegments.size() + " segments");
-        for (AClassSegment seg : cls.classSegments) {
-            System.out.println("Segment " + seg.id + ": duration= " + seg.duration);
+        // First, organize segments by their class
+        for (AClass cls : classes) {
+            List<int[]> sessionAndSlots = new ArrayList<>();
+            // For each segment of this class
+            for (AClassSegment seg : cls.classSegments) {
+                Integer absoluteSlot = bestSolutionSlot.get(seg.id);
+                if (absoluteSlot != null) {
+                    int session = absoluteSlot / nbSlotPerSession;
+                    int slotInSession = absoluteSlot % nbSlotPerSession;
+                    sessionAndSlots.add(new int[]{session, slotInSession});
+                }
+            }
+            // Sort by session, then by slot for consistent output
+            sessionAndSlots.sort((a, b) -> {
+                if (a[0] != b[0]) return Integer.compare(a[0], b[0]);
+                return Integer.compare(a[1], b[1]);
+            });
+            classSchedules.put(cls.id, sessionAndSlots);
+        }
+
+        // Print in required format
+        for (AClass cls : classes) {
+            List<int[]> sessionAndSlots = classSchedules.get(cls.id);
+            StringBuilder sb = new StringBuilder();
+            // Add class ID
+            sb.append(cls.id);
+            // Add number of segments
+            sb.append(" ").append(cls.classSegments.size());
+            // Add session and start slot for each segment
+            for (int[] slot : sessionAndSlots) {
+                sb.append(" ").append(slot[0]).append(" ").append(slot[1]);
+            }
+            System.out.println(sb.toString());
         }
     }
-}
+    public void printInput(){
+        System.out.println("Loaded " + this.totalClasses + "  classes across " + this.courses.size() + " courses");
+        System.out.println("Sessions: " + this.nbSessions + ", Slots per session: " + this.nbSlotPerSession);
+
+        // Print class details
+        for (AClass cls : this.classes) {
+            System.out.println("Class " + cls.id + " (Course " + cls.course + "): " + cls.classSegments.size() + " segments");
+            for (AClassSegment seg : cls.classSegments) {
+                System.out.println("Segment " + seg.id + ": duration= " + seg.duration);
+            }
+        }
+    }
     public static void main(String[] args) {
         // Test file path
-        String testFile = "/Users/moctran/Desktop/HUST/2024.2/GraduationResearch/TimetablingAlgorithmPackage/data/em4-2nd-s-ext1.txt"; // Update this path as needed
+        String testFile = "/Users/moctran/Desktop/HUST/2024.2/GraduationResearch/TimetablingAlgorithmPackage/data/et1-3th-s.txt"; // Update this path as needed
 
         System.out.println("Starting Genetic Algorithm Solver test with file" + testFile);
 
@@ -621,37 +652,30 @@ public void printInput(){
 
         if (solver.hasSolution()) {
             System.out.println("Solution found!");
-            solver.printSolution();
-
+            solver.printSolutionPrefixFormat();
             // Calculate statistics
             Map<Integer, Integer> solution = solver.getSolutionSlot();
             int totalSegments = 0;
             for (AClass cls : solver.classes) {
                 totalSegments += cls.classSegments.size();
             }
-
             System.out.println("Solution Statistics:");
             System.out.println("Assigned segments: " + solution.size() + "/" + totalSegments);
 
-            // Calculate teacher count for final solution
             Chromosome finalChromosome = new Chromosome(solution);
-            int teacherCount = solver.calculateTeacherCount(finalChromosome);
-            System.out.println("Total teachers needed: " + teacherCount);
-
             // Check combination validity
             boolean isValid = solver.isValidCombination(finalChromosome);
             System.out.println("Valid combinations: " + isValid);
 
-            // Print session utilization
-            Map<Integer, Integer> sessionUsage = new HashMap<>();
-            for (Map.Entry<Integer, Integer> entry : solution.entrySet()) {
-                int session = entry.getValue() / solver.nbSlotPerSession;
-                sessionUsage.merge(session, 1, Integer::sum);
+            // Calculate teacher count for final solution
+            if (solver.isValidCombination(finalChromosome))
+            {
+                int teacherCount = solver.calculateTeacherCount(finalChromosome);
+                System.out.println("Total teachers needed: " + teacherCount);
             }
-            System.out.println("Session utilization:");
-            for (Map.Entry<Integer, Integer> entry : sessionUsage.entrySet()) {
-                System.out.println("Session " + entry.getKey() + ": " + entry.getValue() +  " assignments");
-            }
+            // Check session-consecutive pairs
+            System.out.println("Number of pairs of same session consecutive classes: " + solver.calculateCompactness(finalChromosome) );
+
         } else {
             System.out.println("No solution found!");
         }
